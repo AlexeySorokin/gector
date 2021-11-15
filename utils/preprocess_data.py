@@ -325,9 +325,9 @@ def add_labels_to_the_tokens(source_tokens, labels, delimeters=SEQ_DELIMETERS):
     return delimeters['tokens'].join(tokens_with_all_tags)
 
 
-def convert_data_from_raw_files(source_file, target_file, output_file, chunk_size):
+def convert_data_from_raw_files(source_file, target_file, output_file, chunk_size, max_sents=None):
     tagged = []
-    source_data, target_data = read_parallel_lines(source_file, target_file)
+    source_data, target_data = read_parallel_lines(source_file, target_file, max_sents=max_sents)
     print(f"The size of raw dataset is {len(source_data)}")
     cnt_total, cnt_all, cnt_tp = 0, 0, 0
     for source_sent, target_sent in tqdm(zip(source_data, target_data)):
@@ -466,7 +466,7 @@ def convert_tagged_line(line, delimeters=SEQ_DELIMETERS):
 
 
 def main(args):
-    convert_data_from_raw_files(args.source, args.target, args.output_file, args.chunk_size)
+    convert_data_from_raw_files(args.source, args.target, args.output_file, args.chunk_size, max_sents=args.max_sents)
 
 
 if __name__ == '__main__':
@@ -484,5 +484,6 @@ if __name__ == '__main__':
                         type=int,
                         help='Dump each chunk size.',
                         default=1000000)
+    parser.add_argument('-n', "--max_sents", default=None, type=int)
     args = parser.parse_args()
     main(args)

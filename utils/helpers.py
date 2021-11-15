@@ -35,8 +35,7 @@ def get_target_sent_by_edits(source_tokens, edits):
     for edit in edits:
         start, end, label, _ = edit
         target_pos = start + shift_idx
-        source_token = target_tokens[target_pos] \
-            if len(target_tokens) > target_pos >= 0 else ''
+        source_token = target_tokens[target_pos] if len(target_tokens) > target_pos >= 0 else ''
         if label == "":
             del target_tokens[target_pos]
             shift_idx -= 1
@@ -55,7 +54,6 @@ def get_target_sent_by_edits(source_tokens, edits):
         elif label.startswith("$MERGE_"):
             target_tokens[target_pos + 1: target_pos + 1] = [label]
             shift_idx += 1
-
     return replace_merge_transforms(target_tokens)
 
 
@@ -135,9 +133,9 @@ def apply_reverse_transformation(source_token, transform):
         return source_token
 
 
-def read_parallel_lines(fn1, fn2):
-    lines1 = read_lines(fn1, skip_strip=True)
-    lines2 = read_lines(fn2, skip_strip=True)
+def read_parallel_lines(fn1, fn2, max_sents=None):
+    lines1 = read_lines(fn1, skip_strip=True, max_sents=max_sents)
+    lines2 = read_lines(fn2, skip_strip=True, max_sents=max_sents)
     assert len(lines1) == len(lines2)
     out_lines1, out_lines2 = [], []
     for line1, line2 in zip(lines1, lines2):
@@ -149,12 +147,18 @@ def read_parallel_lines(fn1, fn2):
     return out_lines1, out_lines2
 
 
-def read_lines(fn, skip_strip=False):
+def read_lines(fn, skip_strip=False, max_sents=None):
     if not os.path.exists(fn):
         return []
-    with open(fn, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-    return [s.strip() for s in lines if s.strip() or skip_strip]
+    answer = []
+    with open(fn, 'r', encoding='utf-8') as fin:
+        for line in fin:
+            line = line.strip()
+            if line != "" or skip_strip:
+                answer.append(line)
+            if max_sents is not None and len(answer) >= max_sents:
+                break
+    return answer
 
 
 def write_lines(fn, lines, mode='w'):

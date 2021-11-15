@@ -61,6 +61,7 @@ class GecBERTModel(object):
                  min_error_probability=0.0,
                  confidence=0,
                  resolve_cycles=False,
+                 no_merge=False
                  ):
         self.model_weights = list(map(float, weigths)) if weigths else [1] * len(model_paths)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -73,6 +74,9 @@ class GecBERTModel(object):
         self.iterations = iterations
         self.confidence = confidence
         self.resolve_cycles = resolve_cycles
+        self.no_merge = no_merge
+        self._merge_ids = [i for i, letter in self.vocab.get_index_to_token_vocabulary("labels").items()
+                           if "$MERGE" in letter]
         # set training parameters and operations
 
         self.indexers = []
@@ -209,21 +213,28 @@ class GecBERTModel(object):
 
         return batches
 
-    def _convert(self, data):
+    def _convert(self, data, return_keep_probs=False):
         all_class_probs = torch.zeros_like(data[0]['class_probabilities_labels'])
         error_probs = torch.zeros_like(data[0]['max_error_probability'])
         for output, weight in zip(data, self.model_weights):
             all_class_probs += weight * output['class_probabilities_labels'] / sum(self.model_weights)
             error_probs += weight * output['max_error_probability'] / sum(self.model_weights)
+        if self.no_merge:
+            all_class_probs[..., self._merge_ids] = 0.0
+            error_probs[..., self._merge_ids] = 0.0
 
         max_vals = torch.max(all_class_probs, dim=-1)
         probs = max_vals[0].tolist()
         idx = max_vals[1].tolist()
-        return probs, idx, error_probs.tolist()
+        answer = (probs, idx, error_probs.tolist())
+        if return_keep_probs:
+            keep_probs = all_class_probs[...,0]
+            answer += (keep_probs.tolist(),)
+        return answer
 
     def update_final_batch(self, final_batch, pred_ids, pred_batch,
                            prev_preds_dict):
-        new_pred_ids = []
+        new_pred_ids, updated_ids = [], []
         total_updated = 0
         for i, orig_id in enumerate(pred_ids):
             orig = final_batch[orig_id]
@@ -232,20 +243,19 @@ class GecBERTModel(object):
             if orig != pred and pred not in prev_preds:
                 final_batch[orig_id] = pred
                 new_pred_ids.append(orig_id)
+                updated_ids.append(orig_id) # или всё же i
                 prev_preds_dict[orig_id].append(pred)
-                total_updated += 1
             elif orig != pred and pred in prev_preds:
                 # update final batch, but stop iterations
                 final_batch[orig_id] = pred
-                total_updated += 1
+                updated_ids.append(orig_id)
             else:
                 continue
-        return final_batch, new_pred_ids, total_updated
+        return final_batch, new_pred_ids, updated_ids
 
     def postprocess_batch(self, batch, all_probabilities, all_idxs,
-                          error_probs,
-                          max_len=50):
-        all_results = []
+                          error_probs, max_len=50, return_edits=False):
+        all_results, all_edits = [], []
         noop_index = self.vocab.get_token_index("$KEEP", "labels")
         for tokens, probabilities, idxs, error_prob in zip(batch,
                                                            all_probabilities,
@@ -257,11 +267,13 @@ class GecBERTModel(object):
             # skip whole sentences if there no errors
             if max(idxs) == 0:
                 all_results.append(tokens)
+                all_edits.append([])
                 continue
 
             # skip whole sentence if probability of correctness is not high
             if error_prob < self.min_error_probability:
                 all_results.append(tokens)
+                all_edits.append([])
                 continue
 
             for i in range(length + 1):
@@ -274,15 +286,16 @@ class GecBERTModel(object):
                 if idxs[i] == noop_index:
                     continue
 
-                sugg_token = self.vocab.get_token_from_index(idxs[i],
-                                                             namespace='labels')
-                action = self.get_token_action(token, i, probabilities[i],
-                                               sugg_token)
+                sugg_token = self.vocab.get_token_from_index(idxs[i], namespace='labels')
+                action = self.get_token_action(token, i, probabilities[i], sugg_token)
                 if not action:
                     continue
 
                 edits.append(action)
             all_results.append(get_target_sent_by_edits(tokens, edits))
+            all_edits.append(edits)
+        if return_edits:
+            return all_results, all_edits
         return all_results
 
     def handle_batch(self, full_batch):
@@ -311,10 +324,10 @@ class GecBERTModel(object):
             if self.log:
                 print(f"Iteration {n_iter + 1}. Predicted {round(100*len(pred_ids)/batch_size, 1)}% of sentences.")
 
-            final_batch, pred_ids, cnt = \
+            final_batch, pred_ids, updated_ids = \
                 self.update_final_batch(final_batch, pred_ids, pred_batch,
                                         prev_preds_dict)
-            total_updates += cnt
+            total_updates += len(updated_ids)
 
             if not pred_ids:
                 break

@@ -1,11 +1,12 @@
 # GECToR – Grammatical Error Correction: Tag, Not Rewrite
 
-This repository provides code for training and testing state-of-the-art models for grammatical error correction with the official PyTorch implementation of the following paper:
+This repository provides a fork of the repository for the paper
 > [GECToR – Grammatical Error Correction: Tag, Not Rewrite](https://arxiv.org/abs/2005.12592) <br>
 > [Kostiantyn Omelianchuk](https://github.com/komelianchuk), [Vitaliy Atrasevych](https://github.com/atrasevych), [Artem Chernodub](https://github.com/achernodub), [Oleksandr Skurzhanskyi](https://github.com/skurzhanskyi) <br>
 > Grammarly <br>
 > [15th Workshop on Innovative Use of NLP for Building Educational Applications (co-located with ACL 2020)](https://sig-edu.org/bea/current) <br>
 
+It is extended for the paper **Improved grammatical error correction by ranking elementary edits**.
 It is mainly based on `AllenNLP` and `transformers`.
 ## Installation
 The following command installs all necessary packages:
@@ -99,8 +100,15 @@ Among parameters:
 
 For evaluation use [M^2Scorer](https://github.com/nusnlp/m2scorer) and [ERRANT](https://github.com/chrisjbryant/errant).
 
-## Text Simplification
-The code and README for Text Simplification version of GECToR will be added soon.
+## Beam search
+Beam search extension for **GECToR** was added independently for paper **Improved grammatical error correction by ranking elementary edits**.
+To produce the output for the BEA2019 train, dev and test file, run the following commands:
+```shell
+python custom/generate_variants.py -t -2.0 -o TRAIN_OUTPUT_PATH -i DATA_DIR/wi+locness/m2/ABC.train.gold.bea19.m2
+python custom/generate_variants.py -t -2.0 -o DEV_OUTPUT_PATH -i DATA_DIR/wi+locness/m2/ABCN.dev.gold.bea19.m2 -l 1 -L 1000 -S
+python custom/generate_variants.py -t -2.0 -o TEST_OUTPUT_PATH -i DATA_DIR/wi+locness/test/ABCN.test.bea19.orig -l 1 -L 1000 -S -r
+```
+Here `DATA_DIR` is where you unzip the archive with [BEA2019 data](https://www.cl.cam.ac.uk/research/nl/bea2019st/#data).
 
 ## Citation
 If you find this work is useful for your research, please cite our paper:

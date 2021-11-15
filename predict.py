@@ -1,5 +1,7 @@
 import argparse
 
+from tqdm.auto import tqdm
+
 from utils.helpers import read_lines
 from gector.gec_model import GecBERTModel
 
@@ -9,7 +11,7 @@ def predict_for_file(input_file, output_file, model, batch_size=32):
     predictions = []
     cnt_corrections = 0
     batch = []
-    for sent in test_data:
+    for sent in tqdm(test_data):
         batch.append(sent.split())
         if len(batch) == batch_size:
             preds, cnt = model.handle_batch(batch)
@@ -50,17 +52,17 @@ def main(args):
 if __name__ == '__main__':
     # read parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path',
+    parser.add_argument('-m', '--model_path',
                         help='Path to the model file.', nargs='+',
                         required=True)
     parser.add_argument('--vocab_path',
                         help='Path to the model file.',
                         default='data/output_vocabulary'  # to use pretrained models
                         )
-    parser.add_argument('--input_file',
+    parser.add_argument('-i', '--input_file',
                         help='Path to the evalset file',
                         required=True)
-    parser.add_argument('--output_file',
+    parser.add_argument('-o', '--output_file',
                         help='Path to the output file',
                         required=True)
     parser.add_argument('--max_len',
