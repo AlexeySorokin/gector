@@ -1,4 +1,5 @@
 import argparse
+import time
 
 from tqdm.auto import tqdm
 
@@ -11,6 +12,7 @@ def predict_for_file(input_file, output_file, model, batch_size=32):
     predictions = []
     cnt_corrections = 0
     batch = []
+    t1 = time.time()
     for sent in tqdm(test_data):
         batch.append(sent.split())
         if len(batch) == batch_size:
@@ -22,6 +24,8 @@ def predict_for_file(input_file, output_file, model, batch_size=32):
         preds, cnt = model.handle_batch(batch)
         predictions.extend(preds)
         cnt_corrections += cnt
+    t2 = time.time()
+    print(f"Elapsed time {t2 - t1:.6f}")
 
     with open(output_file, 'w') as f:
         f.write("\n".join([" ".join(x) for x in predictions]) + '\n')

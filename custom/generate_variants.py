@@ -3,6 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import argparse
+import time
 import bisect
 import json
 
@@ -136,7 +137,9 @@ if __name__ == "__main__":
     if not args.raw and args.verbose is not None:
         with open(args.verbose, "w", encoding="utf8") as fout:
             pass
+    total_time = 0.0
     for start in tqdm(range(0, len(data), args.chunk_size)):
+        t1 = time.time()
         curr_data = data[start:start+args.chunk_size]
         sents = spacy_model.pipe([" ".join(x["source"]) for x in curr_data], to_conll=False, to_words=True)
         # obtain the candidate edits and evaluate
@@ -148,6 +151,7 @@ if __name__ == "__main__":
         # dump the candidate edits
         edit_data = [make_edit_data(*elem, split_to_variants=args.split_to_variants, annotator=args.annotator)
                      for elem in zip(extracted_edits, sents, curr_data)]
+        total_time += time.time() - t1
         if not args.raw:
             not_found += sum([int(edit["is_correct"] and not edit["is_generated"])
                             for elem in edit_data for sent in elem for edit in sent["edits"]])
@@ -174,3 +178,4 @@ if __name__ == "__main__":
                             print(edit["start"], edit["end"], f"{source}->{edit['target']}",
                                   f"generated={is_generated}", f"correct={is_correct}", file=fout)
                     print("", file=fout)
+    print(f"Elapsed time {total_time:.6f}")
